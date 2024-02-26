@@ -290,7 +290,6 @@ def point_cloud_callback(point_cloud_msg, args):
     ptCloud.points = o3d.utility.Vector3dVector(points_list)
 
     # Run optimizer
-    print('Optimizing')
     ground_pcl, nonground_pcl, img_legs, img_DEM = optimizer(ptCloud, ground_estimator, tform, tform_inv)
 
     # publish results of optimizer
