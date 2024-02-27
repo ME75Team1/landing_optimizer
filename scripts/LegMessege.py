@@ -7,7 +7,8 @@ import sensor_msgs.msg
 from sensor_msgs.msg import PointCloud2
 import geometry_msgs.msg
 import sensor_msgs.point_cloud2 as pc2
-import ros_numpy
+import std_msgs.msg
+
 
 class NearestNeighborInterpolator:
     def __init__(self, points, values):
@@ -35,23 +36,36 @@ def process_point_cloud(point_cloud_msg):
 
     return leg_positions, leg_heights
 
-def point_cloud_callback(point_cloud_msg, pub):
+def point_cloud_callback(point_cloud_msg, arg):
     leg_positions, leg_heights = process_point_cloud(point_cloud_msg)
-
+    publf = arg[0]
+    publb = arg[1]
+    pubrf = arg[2]
+    pubrb = arg[3]
+    print("test")
     # Create and publish a message for each leg position
-    for i, (pos, height) in enumerate(zip(leg_positions, leg_heights)):
-        point_msg = geometry_msgs.msg.Point()
-        point_msg.x = pos[0]
-        point_msg.y = pos[1]
-        point_msg.z = height
-        pub.publish(point_msg)
+    for i, height in enumerate(leg_heights):
+        point_msg = std_msgs.msg.Float64()
+        point_msg = height
+        if i == 0:
+            pubrf.publish(point_msg)
+        elif i == 1:
+            publf.publish(point_msg)
+        elif i == 2:
+            pubrb.publish(point_msg)
+        elif i == 3:
+            publb.publish(point_msg)
+        print(point_msg)
 
 def main():
     rospy.init_node('leg_position_publisher', anonymous=True)
 
-    pub = rospy.Publisher('leg_positions', geometry_msgs.msg.Point, queue_size=10)
+    publf = rospy.Publisher('leg_positions/lf', std_msgs.msg.Float64, queue_size=10)
+    publb = rospy.Publisher('leg_positions/lb', std_msgs.msg.Float64, queue_size=10)
+    pubrf = rospy.Publisher('leg_positions/rf', std_msgs.msg.Float64, queue_size=10)
+    pubrb = rospy.Publisher('leg_positions/rb', std_msgs.msg.Float64, queue_size=10)
 
-    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', PointCloud2, point_cloud_callback, pub, queue_size=1)
+    rospy.Subscriber('/zed2/zed_node/point_cloud/cloud_registered', PointCloud2, point_cloud_callback, (publf, publb, pubrf, pubrb), queue_size=1)
 
     rospy.spin()
 
