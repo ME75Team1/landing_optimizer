@@ -172,11 +172,12 @@ def optimizer(ptCloud, ground_estimator, tform, tform_inv):
 
     # Separate ground from non-ground using SMRF algorithm from LIDAR toolbox
     ptCloudzNP = np.asarray(ptCloudz.points)
-    ground_idxs = ground_estimator.estimate_ground(ptCloudzNP)
-    ground_pcl = ptCloudzNP[ground_idxs]
+    # ground_idxs = ground_estimator.estimate_ground(ptCloudzNP)
+    # ground_pcl = ptCloudzNP[ground_idxs]
+    ground_pcl = ptCloudzNP
 
     # Get non-ground point cloud
-    nonGroundPts = np.delete(ptCloudzNP, ground_idxs, axis=0)
+    # nonGroundPts = np.delete(ptCloudzNP, ground_idxs, axis=0)
 
     # Convert ground point cloud to digital terrain model
     grid_size = [0.02, 0.02]
@@ -214,9 +215,9 @@ def optimizer(ptCloud, ground_estimator, tform, tform_inv):
     groundPtCloud_tform = groundPtCloud.transform(tform_inv)
 
     # transform nonground point cloud back to original axes
-    nongroundPtCloud = o3d.geometry.PointCloud()
-    nongroundPtCloud.points = o3d.utility.Vector3dVector(nonGroundPts)
-    nongroundPtCloud_tform = nongroundPtCloud.transform(tform_inv)
+    # nongroundPtCloud = o3d.geometry.PointCloud()
+    # nongroundPtCloud.points = o3d.utility.Vector3dVector(nonGroundPts)
+    # nongroundPtCloud_tform = nongroundPtCloud.transform(tform_inv)
 
     # prepare plot of optimal landing locations
     fig, ax = plt.subplots()
@@ -248,7 +249,7 @@ def optimizer(ptCloud, ground_estimator, tform, tform_inv):
     DEM_np = DEM_np.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
 
-    return(np.asarray(groundPtCloud_tform.points), np.asarray(nongroundPtCloud_tform.points), img_np, DEM_np)
+    return(np.asarray(groundPtCloud_tform.points), img_np, DEM_np)
 
 def convert_numpy_to_pc2_msg(numpy_pcl):
     fields = [sensor_msgs.msg.PointField('x', 0, sensor_msgs.msg.PointField.FLOAT32, 1),
@@ -268,8 +269,10 @@ def point_cloud_callback(point_cloud_msg, args):
     ground_estimator = args[0]
     pub_legs = args[1]
     pub_ground = args[2]
-    pub_nonground = args[3]
-    pub_DEM = args[4]
+    # pub_nonground = args[3]
+    pub_DEM = args[3]
+
+    print(point_cloud_msg.header)
 
     # Define rotation transform
     rotationAngles = [np.pi/2, 0, 0]  
@@ -290,13 +293,13 @@ def point_cloud_callback(point_cloud_msg, args):
     ptCloud.points = o3d.utility.Vector3dVector(points_list)
 
     # Run optimizer
-    ground_pcl, nonground_pcl, img_legs, img_DEM = optimizer(ptCloud, ground_estimator, tform, tform_inv)
+    ground_pcl, img_legs, img_DEM = optimizer(ptCloud, ground_estimator, tform, tform_inv)
 
     # publish results of optimizer
     pub_legs.publish(convert_numpy_to_img_msg(img_legs))
     pub_DEM.publish(convert_numpy_to_img_msg(img_DEM))
     pub_ground.publish(convert_numpy_to_pc2_msg(ground_pcl))
-    pub_nonground.publish(convert_numpy_to_pc2_msg(nonground_pcl))
+    # pub_nonground.publish(convert_numpy_to_pc2_msg(nonground_pcl))
 
 def main():
     # Instantiate ground estimator
@@ -308,12 +311,12 @@ def main():
     # Create a publisher to publish plot
     pub_legs = rospy.Publisher('/optimizer/optimal_landing_locations', sensor_msgs.msg.Image, queue_size = 1)
     pub_ground = rospy.Publisher('/optimizer/ground_point_cloud', sensor_msgs.msg.PointCloud2, queue_size = 1)
-    pub_nonground = rospy.Publisher('/optimizer/non_ground_point_cloud', sensor_msgs.msg.PointCloud2, queue_size = 1)
+    # pub_nonground = rospy.Publisher('/optimizer/non_ground_point_cloud', sensor_msgs.msg.PointCloud2, queue_size = 1)
     pub_DEM = rospy.Publisher('/optimizer/digital_elevation_model', sensor_msgs.msg.Image, queue_size = 1)
 
     # Create a subscriber to the point cloud topic
     # Replace 'input_point_cloud_topic' with your actual topic name
-    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (ground_estimator, pub_legs, pub_ground, pub_nonground, pub_DEM), queue_size=1)
+    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (ground_estimator, pub_legs, pub_ground, pub_DEM), queue_size=1)
 
     # Spin to keep the script for exiting
     rospy.spin()

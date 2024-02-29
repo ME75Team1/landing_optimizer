@@ -42,7 +42,6 @@ def point_cloud_callback(point_cloud_msg, arg):
     publb = arg[1]
     pubrf = arg[2]
     pubrb = arg[3]
-    print("test")
     # Create and publish a message for each leg position
     for i, height in enumerate(leg_heights):
         point_msg = std_msgs.msg.Float64()
@@ -55,7 +54,6 @@ def point_cloud_callback(point_cloud_msg, arg):
             pubrb.publish(point_msg)
         elif i == 3:
             publb.publish(point_msg)
-        print(point_msg)
 
 def main():
     rospy.init_node('leg_position_publisher', anonymous=True)
