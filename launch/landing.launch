@@ -1,0 +1,12 @@
+<launch>
+    <param name="leg_positions/lf" value="[0.1, 0.1]"/>
+    <param name="leg_positions/lb" value="[0.1, 0.1]"/>
+    <param name="leg_positions/rf" value="[0.1, 0.1]"/>
+    <param name="leg_positions/rb" value="[0.1, 0.1]"/>
+    <!-- leg_position/lf = 0.1
+    leg_position/lb = 0.1
+    leg_position/rf = 0.1
+    leg_position/rb = 0.1 -->
+    <node pkg="landing_optimizer" type="PythonLandingROS.py" name = "point_cloud_optimizer" output="screen"></node>
+    <node pkg="landing_optimizer" type="LegMessage.py" name = "leg_position_publisher" output="screen"></node>
+</launch>
