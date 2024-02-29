@@ -25,19 +25,24 @@ def process_point_cloud(point_cloud_msg):
     ptCloud.points = o3d.utility.Vector3dVector(points)
 
     # Assuming the legs are defined by specific x, y positions
-    leg_positions = np.array([[0.1, 0.1], [-0.1, 0.1], [0.1, -0.1], [-0.1, -0.1]])  
+    lf_position = convert_string_to_list(rospy.get_param("/leg_positions/lf"))
+    rf_position = convert_string_to_list(rospy.get_param("/leg_positions/rf"))
+    lb_position = convert_string_to_list(rospy.get_param("/leg_positions/lb"))
+    rb_position = convert_string_to_list(rospy.get_param("/leg_positions/rb"))
+    leg_positions = np.array([rf_position, lf_position, rb_position, lb_position]).astype(float)
     z_values = points[:, 2]  # Extract z values from the point cloud
     interpolator = NearestNeighborInterpolator(points[:, :2], z_values)
 
     leg_heights = []
     for pos in leg_positions:
+        print(pos)
         z = interpolator(pos[0], pos[1])
         leg_heights.append(z)
 
-    return leg_positions, leg_heights
+    return leg_heights
 
 def point_cloud_callback(point_cloud_msg, arg):
-    leg_positions, leg_heights = process_point_cloud(point_cloud_msg)
+    leg_heights = process_point_cloud(point_cloud_msg)
     publf = arg[0]
     publb = arg[1]
     pubrf = arg[2]
@@ -55,13 +60,17 @@ def point_cloud_callback(point_cloud_msg, arg):
         elif i == 3:
             publb.publish(point_msg)
 
+def convert_string_to_list(list_string):
+    list_list = list_string.strip('][').split(', ')
+    return(list_list)
+
 def main():
     rospy.init_node('leg_position_publisher', anonymous=True)
 
-    publf = rospy.Publisher('leg_positions/lf', std_msgs.msg.Float64, queue_size=10)
-    publb = rospy.Publisher('leg_positions/lb', std_msgs.msg.Float64, queue_size=10)
-    pubrf = rospy.Publisher('leg_positions/rf', std_msgs.msg.Float64, queue_size=10)
-    pubrb = rospy.Publisher('leg_positions/rb', std_msgs.msg.Float64, queue_size=10)
+    publf = rospy.Publisher('/leg_heights/lf', std_msgs.msg.Float64, queue_size=10)
+    publb = rospy.Publisher('/leg_heights/lb', std_msgs.msg.Float64, queue_size=10)
+    pubrf = rospy.Publisher('/leg_heights/rf', std_msgs.msg.Float64, queue_size=10)
+    pubrb = rospy.Publisher('/leg_heights/rb', std_msgs.msg.Float64, queue_size=10)
 
     rospy.Subscriber('/zed2/zed_node/point_cloud/cloud_registered', PointCloud2, point_cloud_callback, (publf, publb, pubrf, pubrb), queue_size=1)
 

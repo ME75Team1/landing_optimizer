@@ -272,8 +272,6 @@ def point_cloud_callback(point_cloud_msg, args):
     # pub_nonground = args[3]
     pub_DEM = args[3]
 
-    print(point_cloud_msg.header)
-
     # Define rotation transform
     rotationAngles = [np.pi/2, 0, 0]  
     translation = [0, 0, 0]
