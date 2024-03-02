@@ -5,7 +5,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
-from pygroundsegmentation import GroundPlaneFitting
 import scipy.interpolate
 import scipy.stats
 import sensor_msgs
@@ -166,7 +165,7 @@ class tree(object):
         return self.__call__(X, k, eps, p, regularize_by)
 
 
-def optimizer(ptCloud, ground_estimator, tform, tform_inv):
+def optimizer(ptCloud, tform, tform_inv):
     # Transform axes so z is vertical axis
     ptCloudz = ptCloud.transform(tform)
 
@@ -266,11 +265,9 @@ def convert_numpy_to_img_msg(img_np):
 
 def point_cloud_callback(point_cloud_msg, args):
     # unpack args
-    ground_estimator = args[0]
-    pub_legs = args[1]
-    pub_ground = args[2]
-    # pub_nonground = args[3]
-    pub_DEM = args[3]
+    pub_legs = args[0]
+    pub_ground = args[1]
+    pub_DEM = args[2]
 
     # Define rotation transform
     rotationAngles = [np.pi/2, 0, 0]  
@@ -291,7 +288,7 @@ def point_cloud_callback(point_cloud_msg, args):
     ptCloud.points = o3d.utility.Vector3dVector(points_list)
 
     # Run optimizer
-    ground_pcl, img_legs, img_DEM = optimizer(ptCloud, ground_estimator, tform, tform_inv)
+    ground_pcl, img_legs, img_DEM = optimizer(ptCloud, tform, tform_inv)
 
     # publish results of optimizer
     pub_legs.publish(convert_numpy_to_img_msg(img_legs))
@@ -314,7 +311,7 @@ def main():
 
     # Create a subscriber to the point cloud topic
     # Replace 'input_point_cloud_topic' with your actual topic name
-    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (ground_estimator, pub_legs, pub_ground, pub_DEM), queue_size=1)
+    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_ground, pub_DEM), queue_size=1)
 
     # Spin to keep the script for exiting
     rospy.spin()
