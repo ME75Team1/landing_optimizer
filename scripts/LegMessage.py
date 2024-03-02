@@ -25,17 +25,17 @@ def process_point_cloud(point_cloud_msg):
     ptCloud.points = o3d.utility.Vector3dVector(points)
 
     # Assuming the legs are defined by specific x, y positions
-    lf_position = convert_string_to_list(rospy.get_param("/leg_positions/lf"))
-    rf_position = convert_string_to_list(rospy.get_param("/leg_positions/rf"))
-    lb_position = convert_string_to_list(rospy.get_param("/leg_positions/lb"))
-    rb_position = convert_string_to_list(rospy.get_param("/leg_positions/rb"))
+    lf_position = rospy.get_param("/leg_positions/lf")
+    rf_position = rospy.get_param("/leg_positions/rf")
+    lb_position = rospy.get_param("/leg_positions/lb")
+    rb_position = rospy.get_param("/leg_positions/rb")
     leg_positions = np.array([rf_position, lf_position, rb_position, lb_position]).astype(float)
     z_values = points[:, 2]  # Extract z values from the point cloud
     interpolator = NearestNeighborInterpolator(points[:, :2], z_values)
 
     leg_heights = []
     for pos in leg_positions:
-        print(pos)
+        # print(pos)
         z = interpolator(pos[0], pos[1])
         leg_heights.append(z)
 

@@ -1,5 +1,4 @@
 <launch>
     <rosparam file="$(find landing_optimizer)/params/params.yaml" />
     <node pkg="landing_optimizer" type="PythonLandingROS.py" name = "point_cloud_optimizer" output="screen"></node>
-    <node pkg="landing_optimizer" type="LegMessage.py" name = "leg_position_publisher" output="screen"></node>
 </launch>
