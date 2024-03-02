@@ -297,9 +297,6 @@ def point_cloud_callback(point_cloud_msg, args):
     # pub_nonground.publish(convert_numpy_to_pc2_msg(nonground_pcl))
 
 def main():
-    # Instantiate ground estimator
-    ground_estimator = GroundPlaneFitting() #Instantiate one of the Estimators
-
     # Initialize the ROS node
     rospy.init_node('point_cloud_optimizer', anonymous=True)
 
