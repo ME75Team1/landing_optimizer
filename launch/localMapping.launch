@@ -1,4 +1,5 @@
 <launch>
     <rosparam file="$(find motor_controller)/params/params.yaml" />
+    <rosparam file="$(find landing_optimizer)/params/mapping_params.yaml" />
     <node pkg="landing_optimizer" type="PythonLandingROS.py" name = "point_cloud_optimizer" output="screen"></node>
 </launch>
