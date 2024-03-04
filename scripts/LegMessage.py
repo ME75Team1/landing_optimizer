@@ -8,6 +8,7 @@ from sensor_msgs.msg import PointCloud2
 import geometry_msgs.msg
 import sensor_msgs.point_cloud2 as pc2
 import std_msgs.msg
+from landing_optimizer.msg import legHeights
 
 
 class NearestNeighborInterpolator:
@@ -33,32 +34,15 @@ def process_point_cloud(point_cloud_msg):
     z_values = points[:, 2]  # Extract z values from the point cloud
     interpolator = NearestNeighborInterpolator(points[:, :2], z_values)
 
-    leg_heights = []
-    for pos in leg_positions:
-        # print(pos)
-        z = interpolator(pos[0], pos[1])
-        leg_heights.append(z)
-
+    leg_heights = legHeights()
+    leg_heights.ids = [rospy.get_param('/dynamixel_ids/lf'), rospy.get_param('/dynamixel_ids/rf'),rospy.get_param('/dynamixel_ids/rb'),rospy.get_param('/dynamixel_ids/lb')]
+    leg_heights.heights = [interpolator(lf_position[0], lf_position[1]), interpolator(rf_position[0], rf_position[1]), interpolator(rb_position[0], rb_position[1]), interpolator(lb_position[0], lb_position[1])]
     return leg_heights
 
-def point_cloud_callback(point_cloud_msg, arg):
+def point_cloud_callback(point_cloud_msg, pub):
     leg_heights = process_point_cloud(point_cloud_msg)
-    publf = arg[0]
-    publb = arg[1]
-    pubrf = arg[2]
-    pubrb = arg[3]
-    # Create and publish a message for each leg position
-    for i, height in enumerate(leg_heights):
-        point_msg = std_msgs.msg.Float64()
-        point_msg = height
-        if i == 0:
-            pubrf.publish(point_msg)
-        elif i == 1:
-            publf.publish(point_msg)
-        elif i == 2:
-            pubrb.publish(point_msg)
-        elif i == 3:
-            publb.publish(point_msg)
+    print(leg_heights)
+    pub.publish(leg_heights)
 
 def convert_string_to_list(list_string):
     list_list = list_string.strip('][').split(', ')
@@ -67,12 +51,9 @@ def convert_string_to_list(list_string):
 def main():
     rospy.init_node('leg_position_publisher', anonymous=True)
 
-    publf = rospy.Publisher('/leg_heights/lf', std_msgs.msg.Float64, queue_size=10)
-    publb = rospy.Publisher('/leg_heights/lb', std_msgs.msg.Float64, queue_size=10)
-    pubrf = rospy.Publisher('/leg_heights/rf', std_msgs.msg.Float64, queue_size=10)
-    pubrb = rospy.Publisher('/leg_heights/rb', std_msgs.msg.Float64, queue_size=10)
+    pub = rospy.Publisher('/leg_heights', legHeights, queue_size=1)
 
-    rospy.Subscriber('/zed2/zed_node/point_cloud/cloud_registered', PointCloud2, point_cloud_callback, (publf, publb, pubrf, pubrb), queue_size=1)
+    rospy.Subscriber('/zed2/zed_node/point_cloud/cloud_registered', PointCloud2, point_cloud_callback, (pub), queue_size=1)
 
     rospy.spin()
 

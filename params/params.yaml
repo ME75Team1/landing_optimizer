@@ -2,3 +2,7 @@
 /leg_positions/lb: [-0.05, 0.2]
 /leg_positions/rf: [0.15, 0]
 /leg_positions/rb: [0.15, 0.2]
+/dynamixel_ids/lf: 1
+/dynamixel_ids/lb: 2
+/dynamixel_ids/rf: 3
+/dynamixel_ids/rb: 4
