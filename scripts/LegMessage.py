@@ -31,8 +31,8 @@ def process_point_cloud(point_cloud_msg):
     lb_position = rospy.get_param("/leg_positions/lb")
     rb_position = rospy.get_param("/leg_positions/rb")
     leg_positions = np.array([rf_position, lf_position, rb_position, lb_position]).astype(float)
-    z_values = points[:, 2]  # Extract z values from the point cloud
-    interpolator = NearestNeighborInterpolator(points[:, :2], z_values)
+    depth_values = points[:, 0]  # Extract z values from the point cloud
+    interpolator = NearestNeighborInterpolator(points[:, 1:], depth_values)
 
     leg_heights = legHeights()
     leg_heights.ids = [rospy.get_param('/dynamixel_ids/lf'), rospy.get_param('/dynamixel_ids/rf'),rospy.get_param('/dynamixel_ids/rb'),rospy.get_param('/dynamixel_ids/lb')]
