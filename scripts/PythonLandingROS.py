@@ -165,21 +165,10 @@ class tree(object):
         return self.__call__(X, k, eps, p, regularize_by)
 
 
-def optimizer(ptCloud, tform, tform_inv):
-    # Transform axes so z is vertical axis
-    ptCloudz = ptCloud.transform(tform)
-
-    # Separate ground from non-ground using SMRF algorithm from LIDAR toolbox
-    ptCloudzNP = np.asarray(ptCloudz.points)
-    # ground_idxs = ground_estimator.estimate_ground(ptCloudzNP)
-    # ground_pcl = ptCloudzNP[ground_idxs]
-    ground_pcl = ptCloudzNP
-
-    # Get non-ground point cloud
-    # nonGroundPts = np.delete(ptCloudzNP, ground_idxs, axis=0)
-
+def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg):
     # Convert ground point cloud to digital terrain model
-    grid_size = [0.02, 0.02]
+    grid_size = [distance_to_right_leg/8, distance_to_top_leg/8]
+    # grid_size = [0.02, 0.02]
     x_min, x_max = np.min(ground_pcl[:, 0]), np.max(ground_pcl[:, 0])
     y_min, y_max = np.min(ground_pcl[:, 1]), np.max(ground_pcl[:, 1])
     xGrid = np.arange(x_min, x_max + grid_size[0], grid_size[0])
@@ -192,8 +181,8 @@ def optimizer(ptCloud, tform, tform_inv):
     z2 = idw_tree(X2)
     terrainModel = z2.reshape(grid_shape)
 
-    distance_to_top_leg = 0.08
-    distance_to_right_leg = 0.06
+    # distance_to_top_leg = 0.08
+    # distance_to_right_leg = 0.06
     distance_to_top_leg_points = int(distance_to_top_leg/grid_size[1])
     distance_to_right_leg_points = int(distance_to_right_leg/grid_size[0])
 
@@ -208,23 +197,13 @@ def optimizer(ptCloud, tform, tform_inv):
     min_leg_height = np.fmin(np.fmin(np.fmin(bottom_left_height, bottom_right_height), top_left_height), top_right_height)
     maximum_leg_height_difference = max_leg_height - min_leg_height
 
-    # transform ground point cloud back to original axes
-    groundPtCloud = o3d.geometry.PointCloud()
-    groundPtCloud.points = o3d.utility.Vector3dVector(ground_pcl)
-    groundPtCloud_tform = groundPtCloud.transform(tform_inv)
-
-    # transform nonground point cloud back to original axes
-    # nongroundPtCloud = o3d.geometry.PointCloud()
-    # nongroundPtCloud.points = o3d.utility.Vector3dVector(nonGroundPts)
-    # nongroundPtCloud_tform = nongroundPtCloud.transform(tform_inv)
-
     # prepare plot of optimal landing locations
     fig, ax = plt.subplots()
     contourf_ = ax.contourf(XGrid[0:(len(yGrid) - distance_to_top_leg_points), 0:(len(xGrid) - distance_to_right_leg_points)], 
                 YGrid[0:(len(yGrid) - distance_to_top_leg_points), 0:(len(xGrid) - distance_to_right_leg_points)], 
                 maximum_leg_height_difference, 100, cmap='viridis', levels=np.linspace(0,0.2,100), extend = 'max')
     plt.xlabel('x (m)')
-    plt.ylabel('z (m)')
+    plt.ylabel('y (m)')
     plt.title('Leg Differences (m)')
     plt.ylim()
     cbar = fig.colorbar(contourf_,ticks=[0,0.04,0.08,0.12,0.16,0.2])
@@ -239,7 +218,7 @@ def optimizer(ptCloud, tform, tform_inv):
                 YGrid[0:(len(yGrid)), 0:(len(xGrid))], 
                 terrainModel, 100, cmap='viridis')
     plt.xlabel('x (m)')
-    plt.ylabel('z (m)')
+    plt.ylabel('y (m)')
     plt.title('Digital Elevation Model (m)')
     plt.ylim()
     fig.colorbar(contourf_)
@@ -248,7 +227,7 @@ def optimizer(ptCloud, tform, tform_inv):
     DEM_np = DEM_np.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
 
-    return(np.asarray(groundPtCloud_tform.points), img_np, DEM_np)
+    return(img_np, DEM_np)
 
 def convert_numpy_to_pc2_msg(numpy_pcl):
     fields = [sensor_msgs.msg.PointField('x', 0, sensor_msgs.msg.PointField.FLOAT32, 1),
@@ -266,49 +245,44 @@ def convert_numpy_to_img_msg(img_np):
 def point_cloud_callback(point_cloud_msg, args):
     # unpack args
     pub_legs = args[0]
-    pub_ground = args[1]
-    pub_DEM = args[2]
-
-    # Define rotation transform
-    rotationAngles = [np.pi/2, 0, 0]  
-    translation = [0, 0, 0]
-    tform = np.eye(4)
-    tform[:3, :3] = o3d.geometry.get_rotation_matrix_from_xyz(rotationAngles)
-    tform[:3, 3] = translation
-
-    rotationAngles_inv = [-np.pi/2, 0, 0]
-    tform_inv = np.eye(4)
-    tform_inv[:3, :3] = o3d.geometry.get_rotation_matrix_from_xyz(rotationAngles_inv)
-    tform_inv[:3, 3] = translation
+    # pub_ground = args[1]
+    pub_DEM = args[1]
+    distance_to_top_leg = args[2]
+    distance_to_right_leg = args[3]
 
     # Convert ROS PointCloud2 message to Open3D PointCloud
     points_list = list(sensor_msgs.point_cloud2.read_points(point_cloud_msg, skip_nans=True, field_names = ("x", "y", "z")))
     points_list = np.asarray(points_list)
-    ptCloud = o3d.geometry.PointCloud()
-    ptCloud.points = o3d.utility.Vector3dVector(points_list)
 
     # Run optimizer
-    ground_pcl, img_legs, img_DEM = optimizer(ptCloud, tform, tform_inv)
+    img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg)
 
     # publish results of optimizer
     pub_legs.publish(convert_numpy_to_img_msg(img_legs))
     pub_DEM.publish(convert_numpy_to_img_msg(img_DEM))
-    pub_ground.publish(convert_numpy_to_pc2_msg(ground_pcl))
+    # pub_ground.publish(convert_numpy_to_pc2_msg(ground_pcl))
     # pub_nonground.publish(convert_numpy_to_pc2_msg(nonground_pcl))
 
 def main():
     # Initialize the ROS node
     rospy.init_node('point_cloud_optimizer', anonymous=True)
 
+    leg_position_rb = rospy.get_param('/leg_positions/rb')
+    leg_position_lf = rospy.get_param('/leg_positions/lf')
+
+    distance_to_top_leg = abs(leg_position_rb[1] - leg_position_lf[1])
+    distance_to_right_leg = abs(leg_position_rb[0] - leg_position_lf[0])
+
+    print(distance_to_top_leg, distance_to_right_leg)
     # Create a publisher to publish plot
     pub_legs = rospy.Publisher('/optimizer/optimal_landing_locations', sensor_msgs.msg.Image, queue_size = 1)
-    pub_ground = rospy.Publisher('/optimizer/ground_point_cloud', sensor_msgs.msg.PointCloud2, queue_size = 1)
+    # pub_ground = rospy.Publisher('/optimizer/ground_point_cloud', sensor_msgs.msg.PointCloud2, queue_size = 1)
     # pub_nonground = rospy.Publisher('/optimizer/non_ground_point_cloud', sensor_msgs.msg.PointCloud2, queue_size = 1)
     pub_DEM = rospy.Publisher('/optimizer/digital_elevation_model', sensor_msgs.msg.Image, queue_size = 1)
 
     # Create a subscriber to the point cloud topic
     # Replace 'input_point_cloud_topic' with your actual topic name
-    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_ground, pub_DEM), queue_size=1)
+    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_DEM, distance_to_top_leg, distance_to_right_leg), queue_size=1)
 
     # Spin to keep the script for exiting
     rospy.spin()
