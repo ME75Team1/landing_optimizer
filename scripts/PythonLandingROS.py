@@ -165,9 +165,9 @@ class tree(object):
         return self.__call__(X, k, eps, p, regularize_by)
 
 
-def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg):
+def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution):
     # Convert ground point cloud to digital terrain model
-    grid_size = [distance_to_right_leg/8, distance_to_top_leg/8]
+    grid_size = [distance_to_right_leg/resolution[0], distance_to_top_leg/resolution[1]]
     # grid_size = [0.02, 0.02]
     x_min, x_max = np.min(ground_pcl[:, 0]), np.max(ground_pcl[:, 0])
     y_min, y_max = np.min(ground_pcl[:, 1]), np.max(ground_pcl[:, 1])
@@ -249,13 +249,14 @@ def point_cloud_callback(point_cloud_msg, args):
     pub_DEM = args[1]
     distance_to_top_leg = args[2]
     distance_to_right_leg = args[3]
+    resolution = args[4]
 
     # Convert ROS PointCloud2 message to Open3D PointCloud
     points_list = list(sensor_msgs.point_cloud2.read_points(point_cloud_msg, skip_nans=True, field_names = ("x", "y", "z")))
     points_list = np.asarray(points_list)
 
     # Run optimizer
-    img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg)
+    img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg, resolution)
 
     # publish results of optimizer
     pub_legs.publish(convert_numpy_to_img_msg(img_legs))
@@ -269,6 +270,7 @@ def main():
 
     leg_position_rb = rospy.get_param('/leg_positions/rb')
     leg_position_lf = rospy.get_param('/leg_positions/lf')
+    resolution = rospy.get_param('/terrain_model_resolution')
 
     distance_to_top_leg = abs(leg_position_rb[1] - leg_position_lf[1])
     distance_to_right_leg = abs(leg_position_rb[0] - leg_position_lf[0])
@@ -282,7 +284,7 @@ def main():
 
     # Create a subscriber to the point cloud topic
     # Replace 'input_point_cloud_topic' with your actual topic name
-    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_DEM, distance_to_top_leg, distance_to_right_leg), queue_size=1)
+    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_DEM, distance_to_top_leg, distance_to_right_leg, resolution), queue_size=1)
 
     # Spin to keep the script for exiting
     rospy.spin()
