@@ -8,7 +8,7 @@ from sensor_msgs.msg import PointCloud2
 import geometry_msgs.msg
 import sensor_msgs.point_cloud2 as pc2
 import std_msgs.msg
-from landing_optimizer.msg import legHeights
+from motor_controller.msg import legHeights
 
 
 class NearestNeighborInterpolator:

@@ -1,8 +1,0 @@
-/leg_positions/lf: [0.05, 0] # see https://www.stereolabs.com/docs/positional-tracking/coordinate-frames for ROS frame
-/leg_positions/lb: [0.05, -0.2] # positive y is left from left camera
-/leg_positions/rf: [-0.15, 0] # positive z is up from left camera
-/leg_positions/rb: [-0.15, -0.2] # coordinates should be in [y, z] format
-/dynamixel_ids/lf: 1
-/dynamixel_ids/lb: 2
-/dynamixel_ids/rf: 3
-/dynamixel_ids/rb: 4
