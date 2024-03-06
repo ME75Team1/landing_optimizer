@@ -255,14 +255,15 @@ def point_cloud_callback(point_cloud_msg, args):
     points_list = list(sensor_msgs.point_cloud2.read_points(point_cloud_msg, skip_nans=True, field_names = ("x", "y", "z")))
     points_list = np.asarray(points_list)
 
-    # Run optimizer
-    img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg, resolution)
+    if points_list.size > 3:
+        # Run optimizer
+        img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg, resolution)
 
-    # publish results of optimizer
-    pub_legs.publish(convert_numpy_to_img_msg(img_legs))
-    pub_DEM.publish(convert_numpy_to_img_msg(img_DEM))
-    # pub_ground.publish(convert_numpy_to_pc2_msg(ground_pcl))
-    # pub_nonground.publish(convert_numpy_to_pc2_msg(nonground_pcl))
+        # publish results of optimizer
+        pub_legs.publish(convert_numpy_to_img_msg(img_legs))
+        pub_DEM.publish(convert_numpy_to_img_msg(img_DEM))
+        # pub_ground.publish(convert_numpy_to_pc2_msg(ground_pcl))
+        # pub_nonground.publish(convert_numpy_to_pc2_msg(nonground_pcl))
 
 def main():
     # Initialize the ROS node
