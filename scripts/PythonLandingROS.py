@@ -54,6 +54,32 @@ class tree(object):
     demo()
 
     """
+
+    
+    # See https://github.com/paulbrodersen/inverse_distance_weighting
+    # for the original GitHub repository containing this class
+    
+    # This class uses the below license:
+
+    # BEGIN LICENSE
+    # Copyright (C) 2016 Paul Brodersen <paulbrodersen+idw@gmail.com>
+
+    # Author: Paul Brodersen <paulbrodersen+idw@gmail.com>
+    
+    # This program is free software; you can redistribute it and/or
+    # modify it under the terms of the GNU General Public License
+    # as published by the Free Software Foundation; either version 3
+    # of the License, or (at your option) any later version.
+    
+    # This program is distributed in the hope that it will be useful,
+    # but WITHOUT ANY WARRANTY; without even the implied warranty of
+    # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    # GNU General Public License for more details.
+    
+    # You should have received a copy of the GNU General Public License
+    # along with this program. If not, see <http://www.gnu.org/licenses/>.
+    # END LICENSE
+    
     def __init__(self, X=None, z=None, leafsize=10):
         if not X is None:
             self.tree = cKDTree(X, leafsize=leafsize )
