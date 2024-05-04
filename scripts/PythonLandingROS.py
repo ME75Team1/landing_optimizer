@@ -11,6 +11,7 @@ import sensor_msgs
 import sensor_msgs.point_cloud2
 import sensor_msgs.msg
 from scipy.spatial import cKDTree
+from scipy.interpolate import Rbf
 np.float = np.float64  # temp fix for ros_numpy
 import ros_numpy
 import std_msgs.msg
@@ -147,7 +148,8 @@ class tree(object):
         self.distances, self.idx = self.tree.query(X, k, eps=eps, p=p)
         self.distances += regularize_by
         weights = self.z[self.idx.ravel()].reshape(self.idx.shape)
-        mw = np.sum(weights/self.distances, axis=1) / np.sum(1./self.distances, axis=1)
+        rbf = Rbf(X[:, 0], X[:, 1], weights, function='linear')  # Use RBF interpolation
+        mw = rbf(X[:, 0], X[:, 1])
         return mw
 
     def transform(self, X, k=3, p=2, eps=1e-6, regularize_by=1e-9):
@@ -200,12 +202,9 @@ def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution
     xGrid = np.arange(x_min, x_max + grid_size[0], grid_size[0])
     yGrid = np.arange(y_min, y_max + grid_size[1], grid_size[1])
     XGrid, YGrid = np.meshgrid(xGrid, yGrid)
-    idw_tree = tree(ground_pcl[:, 0:2], ground_pcl[:,2], leafsize = 5)
-    X2 = np.meshgrid(xGrid, yGrid)
-    grid_shape = X2[0].shape
-    X2 = np.reshape(X2, (2, -1)).T
-    z2 = idw_tree(X2)
-    terrainModel = z2.reshape(grid_shape)
+    # Use RBF interpolation instead of IDW
+    rbf_interp = scipy.interpolate.Rbf(ground_pcl[:, 0], ground_pcl[:, 1], ground_pcl[:, 2], function='linear')
+    terrainModel = rbf_interp(XGrid, YGrid)
 
     # distance_to_top_leg = 0.08
     # distance_to_right_leg = 0.06
@@ -321,4 +320,3 @@ if __name__ == '__main__':
         main()
     except rospy.ROSInterruptException:
         pass
-
