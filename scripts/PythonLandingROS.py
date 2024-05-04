@@ -311,7 +311,7 @@ def main():
 
     # Create a subscriber to the point cloud topic
     # Replace 'input_point_cloud_topic' with your actual topic name
-    rospy.Subscriber('/zed2/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_DEM, distance_to_top_leg, distance_to_right_leg, resolution), queue_size=1)
+    rospy.Subscriber('/zedm/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_DEM, distance_to_top_leg, distance_to_right_leg, resolution), queue_size=1)
 
     # Spin to keep the script for exiting
     rospy.spin()
