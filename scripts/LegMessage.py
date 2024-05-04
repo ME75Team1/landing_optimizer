@@ -53,7 +53,7 @@ def main():
 
     pub = rospy.Publisher('/leg_heights', legHeights, queue_size=1)
 
-    rospy.Subscriber('/zed2/zed_node/point_cloud/cloud_registered', PointCloud2, point_cloud_callback, (pub), queue_size=1)
+    rospy.Subscriber('/zedm/zed_node/point_cloud/cloud_registered', PointCloud2, point_cloud_callback, (pub), queue_size=1)
 
     rospy.spin()
 
