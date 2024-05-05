@@ -14,6 +14,7 @@ from scipy.spatial import cKDTree
 np.float = np.float64  # temp fix for ros_numpy
 import ros_numpy
 import std_msgs.msg
+from sklearn.ensemble import RandomForestRegressor  # Import Random Forest model
 
 class tree(object):
     """
@@ -191,7 +192,7 @@ class tree(object):
         return self.__call__(X, k, eps, p, regularize_by)
 
 
-def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution):
+def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution, rf):
     # Convert ground point cloud to digital terrain model
     grid_size = [distance_to_right_leg/resolution[0], distance_to_top_leg/resolution[1]]
     # grid_size = [0.02, 0.02]
@@ -200,20 +201,15 @@ def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution
     xGrid = np.arange(x_min, x_max + grid_size[0], grid_size[0])
     yGrid = np.arange(y_min, y_max + grid_size[1], grid_size[1])
     XGrid, YGrid = np.meshgrid(xGrid, yGrid)
-    idw_tree = tree(ground_pcl[:, 0:2], ground_pcl[:,2], leafsize = 5)
-    X2 = np.meshgrid(xGrid, yGrid)
-    grid_shape = X2[0].shape
-    X2 = np.reshape(X2, (2, -1)).T
-    z2 = idw_tree(X2)
-    terrainModel = z2.reshape(grid_shape)
+    
+    # Predict ground elevation using Random Forest model
+    predictions = rf.predict(np.column_stack((XGrid.ravel(), YGrid.ravel())))
+    terrainModel = predictions.reshape(XGrid.shape)
 
-    # distance_to_top_leg = 0.08
-    # distance_to_right_leg = 0.06
+    # Calculate points related to leg positions
     distance_to_top_leg_points = int(distance_to_top_leg/grid_size[1])
     distance_to_right_leg_points = int(distance_to_right_leg/grid_size[0])
 
-    # get locations of each leg as a function of the position of bottom left
-    # leg
     bottom_left_height = terrainModel[0:(len(yGrid) - distance_to_top_leg_points), 0:(len(xGrid) - distance_to_right_leg_points)]
     bottom_right_height = terrainModel[0:(len(yGrid) - distance_to_top_leg_points), (distance_to_right_leg_points + 1 - 1):(len(xGrid))]
     top_left_height = terrainModel[(distance_to_top_leg_points + 1 - 1):len(yGrid), 0:(len(xGrid) - distance_to_right_leg_points)]
@@ -253,7 +249,8 @@ def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution
     DEM_np = DEM_np.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     plt.close()
 
-    return(img_np, DEM_np)
+    return img_np, DEM_np
+
 
 def convert_numpy_to_pc2_msg(numpy_pcl):
     fields = [sensor_msgs.msg.PointField('x', 0, sensor_msgs.msg.PointField.FLOAT32, 1),
@@ -263,19 +260,19 @@ def convert_numpy_to_pc2_msg(numpy_pcl):
     header.frame_id = "map"
     header.stamp = rospy.Time.now()
     pcl_msg = sensor_msgs.point_cloud2.create_cloud(header,fields, numpy_pcl)
-    return(pcl_msg)
+    return pcl_msg
 
 def convert_numpy_to_img_msg(img_np):
-    return(ros_numpy.msgify(sensor_msgs.msg.Image, img_np, encoding = "rgb8"))
+    return ros_numpy.msgify(sensor_msgs.msg.Image, img_np, encoding = "rgb8")
 
 def point_cloud_callback(point_cloud_msg, args):
     # unpack args
     pub_legs = args[0]
-    # pub_ground = args[1]
     pub_DEM = args[1]
     distance_to_top_leg = args[2]
     distance_to_right_leg = args[3]
     resolution = args[4]
+    rf = args[5]  # Random Forest model
 
     # Convert ROS PointCloud2 message to Open3D PointCloud
     points_list = list(sensor_msgs.point_cloud2.read_points(point_cloud_msg, skip_nans=True, field_names = ("x", "y", "z")))
@@ -283,13 +280,11 @@ def point_cloud_callback(point_cloud_msg, args):
 
     if points_list.size > 3:
         # Run optimizer
-        img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg, resolution)
+        img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg, resolution, rf)
 
         # publish results of optimizer
         pub_legs.publish(convert_numpy_to_img_msg(img_legs))
         pub_DEM.publish(convert_numpy_to_img_msg(img_DEM))
-        # pub_ground.publish(convert_numpy_to_pc2_msg(ground_pcl))
-        # pub_nonground.publish(convert_numpy_to_pc2_msg(nonground_pcl))
 
 def main():
     # Initialize the ROS node
@@ -302,18 +297,21 @@ def main():
     distance_to_top_leg = abs(leg_position_rb[1] - leg_position_lf[1])
     distance_to_right_leg = abs(leg_position_rb[0] - leg_position_lf[0])
 
-    print(distance_to_top_leg, distance_to_right_leg)
-    # Create a publisher to publish plot
+    # Load the trained Random Forest model
+    rf = RandomForestRegressor(n_estimators=100, random_state=42)  # Modify parameters as needed
+    # Assuming X_train, y_train are defined, replace them with your actual training data
+    X_train = np.random.rand(1000, 2)  # Example synthetic data
+    y_train = np.random.rand(1000)  # Example synthetic labels
+    rf.fit(X_train, y_train)
+
+    # Create publishers for plot and DEM
     pub_legs = rospy.Publisher('/optimizer/optimal_landing_locations', sensor_msgs.msg.Image, queue_size = 1)
-    # pub_ground = rospy.Publisher('/optimizer/ground_point_cloud', sensor_msgs.msg.PointCloud2, queue_size = 1)
-    # pub_nonground = rospy.Publisher('/optimizer/non_ground_point_cloud', sensor_msgs.msg.PointCloud2, queue_size = 1)
     pub_DEM = rospy.Publisher('/optimizer/digital_elevation_model', sensor_msgs.msg.Image, queue_size = 1)
 
-    # Create a subscriber to the point cloud topic
-    # Replace 'input_point_cloud_topic' with your actual topic name
-    rospy.Subscriber('/zedm/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_DEM, distance_to_top_leg, distance_to_right_leg, resolution), queue_size=1)
+    # Subscribe to the point cloud topic
+    rospy.Subscriber('/zedm/zed_node/mapping/fused_cloud', sensor_msgs.msg.PointCloud2, point_cloud_callback, (pub_legs, pub_DEM, distance_to_top_leg, distance_to_right_leg, resolution, rf), queue_size=1)
 
-    # Spin to keep the script for exiting
+    # Spin to keep the script from exiting
     rospy.spin()
 
 if __name__ == '__main__':
