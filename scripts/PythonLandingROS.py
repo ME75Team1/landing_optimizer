@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import scipy.stats
 import sensor_msgs.point_cloud2
 import sensor_msgs.msg
-float = np.float64  # Replace np.float with float
+float = np.float64  #mport rospy
 
 import std_msgs.msg
 
