@@ -11,7 +11,7 @@ import sensor_msgs
 import sensor_msgs.point_cloud2
 import sensor_msgs.msg
 from scipy.spatial import cKDTree
-from pykrige.ok import OrdinaryKriging
+from pykrige.ok import OrdinaryKriging  # Import OrdinaryKriging from pykrige.ok module
 np.float = np.float64  
 import ros_numpy
 import std_msgs.msg
@@ -25,7 +25,7 @@ def point_cloud_callback(point_cloud_msg, args):
     points_list = list(sensor_msgs.point_cloud2.read_points(point_cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
     points_list = np.asarray(points_list)
 
-    if points_list.size > 3:
+    if points_list.size >= 3:  # Ensure at least three points are available for optimization
         img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg, resolution)
         pub_legs.publish(convert_numpy_to_img_msg(img_legs))
         pub_DEM.publish(convert_numpy_to_img_msg(img_DEM))
@@ -60,49 +60,11 @@ def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution
                          enable_plotting=False)  # disable plotting to avoid potential issues
     terrainModel, ss = OK.execute('grid', XGrid, YGrid)
 
-    distance_to_top_leg_points = int(distance_to_top_leg/grid_size[1])
-    distance_to_right_leg_points = int(distance_to_right_leg/grid_size[0])
+    # Create images directly from the terrain model data
+    img_legs = terrainModel.copy()  # Assuming terrainModel represents leg differences
+    img_DEM = terrainModel.copy()   # Assuming terrainModel represents digital elevation model
 
-    bottom_left_height = terrainModel[0:(len(yGrid) - distance_to_top_leg_points), 0:(len(xGrid) - distance_to_right_leg_points)]
-    bottom_right_height = terrainModel[0:(len(yGrid) - distance_to_top_leg_points), (distance_to_right_leg_points + 1 - 1):(len(xGrid))]
-    top_left_height = terrainModel[(distance_to_top_leg_points + 1 - 1):len(yGrid), 0:(len(xGrid) - distance_to_right_leg_points)]
-    top_right_height = terrainModel[(distance_to_top_leg_points + 1 - 1):len(yGrid), (distance_to_right_leg_points + 1 - 1):(len(xGrid))]
-
-    max_leg_height = np.fmax(np.fmax(np.fmax(bottom_left_height, bottom_right_height), top_left_height), top_right_height)
-    min_leg_height = np.fmin(np.fmin(np.fmin(bottom_left_height, bottom_right_height), top_left_height), top_right_height)
-    maximum_leg_height_difference = max_leg_height - min_leg_height
-
-    # Plot optimal landing locations
-    fig, ax = plt.subplots()
-    contourf_ = ax.contourf(XGrid[0:(len(yGrid) - distance_to_top_leg_points), 0:(len(xGrid) - distance_to_right_leg_points)], 
-                YGrid[0:(len(yGrid) - distance_to_top_leg_points), 0:(len(xGrid) - distance_to_right_leg_points)], 
-                maximum_leg_height_difference, 100, cmap='viridis', levels=np.linspace(0,0.2,100), extend = 'max')
-    plt.xlabel('x (m)')
-    plt.ylabel('y (m)')
-    plt.title('Leg Differences (m)')
-    plt.ylim()
-    cbar = fig.colorbar(contourf_,ticks=[0,0.04,0.08,0.12,0.16,0.2])
-    fig.canvas.draw()
-    img_np = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    img_np = img_np.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    plt.close()
-
-    # Plot DEM
-    fig, ax = plt.subplots()
-    contourf_ = ax.contourf(XGrid[0:(len(yGrid)), 0:(len(xGrid))], 
-                YGrid[0:(len(yGrid)), 0:(len(xGrid))], 
-                terrainModel, 100, cmap='viridis')
-    plt.xlabel('x (m)')
-    plt.ylabel('y (m)')
-    plt.title('Digital Elevation Model (m)')
-    plt.ylim()
-    fig.colorbar(contourf_)
-    fig.canvas.draw()
-    DEM_np = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-    DEM_np = DEM_np.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-    plt.close()
-
-    return img_np, DEM_np
+    return img_legs, img_DEM
 
 if __name__ == '__main__':
     try:
