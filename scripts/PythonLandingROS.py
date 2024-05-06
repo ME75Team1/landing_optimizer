@@ -1,20 +1,13 @@
 import rospy
 import numpy as np
-import open3d as o3d
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import scipy.interpolate
-import scipy.stats
+from pykrige.ok import OrdinaryKriging
 import sensor_msgs
 import sensor_msgs.point_cloud2
 import sensor_msgs.msg
-from scipy.spatial import cKDTree
-from pykrige.ok import OrdinaryKriging  # Import OrdinaryKriging from pykrige.ok module
-np.float = np.float64  
 import ros_numpy
-import std_msgs.msg
 
 def convert_numpy_to_img_msg(img_np):
     return ros_numpy.msgify(sensor_msgs.msg.Image, img_np, encoding="rgb8")
@@ -25,7 +18,7 @@ def point_cloud_callback(point_cloud_msg, args):
     points_list = list(sensor_msgs.point_cloud2.read_points(point_cloud_msg, skip_nans=True, field_names=("x", "y", "z")))
     points_list = np.asarray(points_list)
 
-    if points_list.size >= 3:  # Ensure at least three points are available for optimization
+    if len(points_list) >= 3:  # Ensure at least three points are available for optimization
         img_legs, img_DEM = optimizer(points_list, distance_to_top_leg, distance_to_right_leg, resolution)
         pub_legs.publish(convert_numpy_to_img_msg(img_legs))
         pub_DEM.publish(convert_numpy_to_img_msg(img_DEM))
@@ -49,6 +42,10 @@ def main():
     rospy.spin()
 
 def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution):
+    # Only consider the first 1000 points for optimization
+    num_points_to_use = min(1000, len(ground_pcl))
+    ground_pcl = ground_pcl[:num_points_to_use]
+
     grid_size = [distance_to_right_leg/resolution[0], distance_to_top_leg/resolution[1]]
     x_min, x_max = np.min(ground_pcl[:, 0]), np.max(ground_pcl[:, 0])
     y_min, y_max = np.min(ground_pcl[:, 1]), np.max(ground_pcl[:, 1])
