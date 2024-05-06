@@ -5,7 +5,7 @@ import cv2
 from sensor_msgs.msg import Image, PointCloud2
 from cv_bridge import CvBridge
 import ros_numpy
-
+numpy.float = float
 import matplotlib.pyplot as plt
 import sensor_msgs.point_cloud2 as pc2
 import std_msgs.msg
