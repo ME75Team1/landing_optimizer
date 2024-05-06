@@ -2,27 +2,23 @@ import rospy
 import numpy as np
 import open3d as o3d
 import matplotlib
+from mpl_toolkits.mplot3d import Axes3D
+import sensor_msgs
+from scipy.spatial import cKDTree
+import ros_numpy
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-import scipy.interpolate
 import scipy.stats
-import sensor_msgs
 import sensor_msgs.point_cloud2
 import sensor_msgs.msg
-from scipy.spatial import cKDTree
-from scipy.interpolate import Rbf
 np.float = np.float64  # temp fix for ros_numpy
-import ros_numpy
 import std_msgs.msg
 
-class tree(object):
+class RBFInterpolator(object):
     """
     Compute the score of query points based on the scores of their k-nearest neighbours,
     weighted by the inverse of their distances.
-
-    @reference:
-    https://en.wikipedia.org/wiki/Inverse_distance_weighting
 
     Arguments:
     ----------
@@ -30,66 +26,34 @@ class tree(object):
             Coordinates of N sample points in a d-dimensional space.
         z: (N,) ndarray
             Corresponding scores.
-        leafsize: int (default 10)
-            Leafsize of KD-tree data structure;
-            should be less than 20.
 
     Returns:
     --------
-        tree instance: object
+        RBFInterpolator instance: object
 
     Example:
     --------
 
     # 'train'
-    idw_tree = tree(X1, z1)
+    rbf_interpolator = RBFInterpolator(X1, z1)
 
     # 'test'
     spacing = np.linspace(-5., 5., 100)
     X2 = np.meshgrid(spacing, spacing)
     X2 = np.reshape(X2, (2, -1)).T
-    z2 = idw_tree(X2)
-
-    See also:
-    ---------
-    demo()
+    z2 = rbf_interpolator(X2)
 
     """
 
-    
-    # See https://github.com/paulbrodersen/inverse_distance_weighting
-    # for the original GitHub repository containing this class
-    
-    # This class uses the below license:
-
-    # BEGIN LICENSE
-    # Copyright (C) 2016 Paul Brodersen <paulbrodersen+idw@gmail.com>
-
-    # Author: Paul Brodersen <paulbrodersen+idw@gmail.com>
-    
-    # This program is free software; you can redistribute it and/or
-    # modify it under the terms of the GNU General Public License
-    # as published by the Free Software Foundation; either version 3
-    # of the License, or (at your option) any later version.
-    
-    # This program is distributed in the hope that it will be useful,
-    # but WITHOUT ANY WARRANTY; without even the implied warranty of
-    # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    # GNU General Public License for more details.
-    
-    # You should have received a copy of the GNU General Public License
-    # along with this program. If not, see <http://www.gnu.org/licenses/>.
-    # END LICENSE
-    
-    def __init__(self, X=None, z=None, leafsize=10):
+    def __init__(self, X=None, z=None):
         if not X is None:
-            self.tree = cKDTree(X, leafsize=leafsize )
-        if not z is None:
-            self.z = np.array(z)
+            self.X = X
+            self.z = z
+            self.weights = None
 
-    def fit(self, X=None, z=None, leafsize=10):
+    def fit(self, X=None, z=None):
         """
-        Instantiate KDtree for fast query of k-nearest neighbour distances.
+        Initialize the RBF interpolation model.
 
         Arguments:
         ----------
@@ -97,114 +61,85 @@ class tree(object):
                 Coordinates of N sample points in a d-dimensional space.
             z: (N,) ndarray
                 Corresponding scores.
-            leafsize: int (default 10)
-                Leafsize of KD-tree data structure;
-                should be less than 20.
 
         Returns:
         --------
-            idw_tree instance: object
-
-        Notes:
-        -------
-        Wrapper around __init__().
-
+            RBFInterpolator instance: object
         """
-        return self.__init__(X, z, leafsize)
+        self.X = X
+        self.z = z
+        self.weights = None
 
-    def __call__(self, X, k=3, eps=1e-6, p=2, regularize_by=1e-9):
+    def __call__(self, X):
         """
-        Compute the score of query points based on the scores of their k-nearest neighbours,
-        weighted by the inverse of their distances.
+        Perform RBF interpolation.
 
         Arguments:
         ----------
             X: (N, d) ndarray
                 Coordinates of N query points in a d-dimensional space.
 
-            k: int (default 6)
-                Number of nearest neighbours to use.
-
-            p: int or inf
-                Which Minkowski p-norm to use.
-                1 is the sum-of-absolute-values "Manhattan" distance
-                2 is the usual Euclidean distance
-                infinity is the maximum-coordinate-difference distance
-
-            eps: float (default 1e-6)
-                Return approximate nearest neighbors; the k-th returned value
-                is guaranteed to be no further than (1+eps) times the
-                distance to the real k-th nearest neighbor.
-
-            regularise_by: float (default 1e-9)
-                Regularise distances to prevent division by zero
-                for sample points with the same location as query points.
-
         Returns:
         --------
             z: (N,) ndarray
                 Corresponding scores.
         """
-        self.distances, self.idx = self.tree.query(X, k, eps=eps, p=p)
-        self.distances += regularize_by
-        weights = self.z[self.idx.ravel()].reshape(self.idx.shape)
-        rbf = Rbf(X[:, 0], X[:, 1], weights, function='linear')  # Use RBF interpolation
-        mw = rbf(X[:, 0], X[:, 1])
-        return mw
+        if self.weights is None:
+            self.weights = self._compute_weights()
 
-    def transform(self, X, k=3, p=2, eps=1e-6, regularize_by=1e-9):
+        distances = self._compute_distances(X)
+        z = np.dot(distances, self.weights)
+        return z
+
+    def _compute_weights(self):
         """
-        Compute the score of query points based on the scores of their k-nearest neighbours,
-        weighted by the inverse of their distances.
+        Compute the weights for RBF interpolation.
+
+        Returns:
+        --------
+            weights: (N,) ndarray
+                Interpolation weights.
+        """
+        distances = self._compute_distances(self.X)
+        weights = np.linalg.lstsq(distances, self.z, rcond=None)[0]
+        return weights
+
+    def _compute_distances(self, X):
+        """
+        Compute the distances between query points and sample points.
 
         Arguments:
         ----------
             X: (N, d) ndarray
                 Coordinates of N query points in a d-dimensional space.
 
-            k: int (default 6)
-                Number of nearest neighbours to use.
-
-            p: int or inf
-                Which Minkowski p-norm to use.
-                1 is the sum-of-absolute-values "Manhattan" distance
-                2 is the usual Euclidean distance
-                infinity is the maximum-coordinate-difference distance
-
-            eps: float (default 1e-6)
-                Return approximate nearest neighbors; the k-th returned value
-                is guaranteed to be no further than (1+eps) times the
-                distance to the real k-th nearest neighbor.
-
-            regularise_by: float (default 1e-9)
-                Regularise distances to prevent division by zero
-                for sample points with the same location as query points.
-
         Returns:
         --------
-            z: (N,) ndarray
-                Corresponding scores.
-
-        Notes:
-        ------
-
-        Wrapper around __call__().
+            distances: (N, M) ndarray
+                Distances between query points and sample points.
         """
-        return self.__call__(X, k, eps, p, regularize_by)
-
+        N = X.shape[0]
+        M = self.X.shape[0]
+        distances = np.zeros((N, M))
+        for i in range(N):
+            for j in range(M):
+                distances[i, j] = np.linalg.norm(X[i] - self.X[j])
+        return distances
 
 def optimizer(ground_pcl, distance_to_top_leg, distance_to_right_leg, resolution):
     # Convert ground point cloud to digital terrain model
     grid_size = [distance_to_right_leg/resolution[0], distance_to_top_leg/resolution[1]]
-    # grid_size = [0.02, 0.02]
     x_min, x_max = np.min(ground_pcl[:, 0]), np.max(ground_pcl[:, 0])
     y_min, y_max = np.min(ground_pcl[:, 1]), np.max(ground_pcl[:, 1])
     xGrid = np.arange(x_min, x_max + grid_size[0], grid_size[0])
     yGrid = np.arange(y_min, y_max + grid_size[1], grid_size[1])
     XGrid, YGrid = np.meshgrid(xGrid, yGrid)
-    # Use RBF interpolation instead of IDW
-    rbf_interp = scipy.interpolate.Rbf(ground_pcl[:, 0], ground_pcl[:, 1], ground_pcl[:, 2], function='linear')
-    terrainModel = rbf_interp(XGrid, YGrid)
+    rbf_interpolator = RBFInterpolator(ground_pcl[:, 0:2], ground_pcl[:,2])
+    X2 = np.meshgrid(xGrid, yGrid)
+    grid_shape = X2[0].shape
+    X2 = np.reshape(X2, (2, -1)).T
+    z2 = rbf_interpolator(X2)
+    terrainModel = z2.reshape(grid_shape)
 
     # distance_to_top_leg = 0.08
     # distance_to_right_leg = 0.06
