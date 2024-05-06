@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import scipy.stats
 import sensor_msgs.point_cloud2
 import sensor_msgs.msg
-np.float = np.float64  # temp fix for ros_numpy
+float = np.float64  # Replace np.float with float
+
 import std_msgs.msg
 
 class RBFInterpolator(object):
