@@ -31,16 +31,16 @@ class TerrainAnalyzer:
         print("Median Elevation:", median_elevation)
 
         # Example: Terrain classification based on elevation
-        classified_terrain = classify_terrain(depth_image)
+        classified_terrain = self.classify_terrain(depth_image)
 
     def color_callback(self, msg):
         color_image = self.bridge.imgmsg_to_cv2(msg)
         # Perform terrain analysis using color image (optional)
 
         # Example: Obstacle detection using color image
-        obstacle_mask = detect_obstacles(color_image)
+        obstacle_mask = self.detect_obstacles(color_image)
 
-    def classify_terrain(depth_image):
+    def classify_terrain(self, depth_image):
         # Placeholder for terrain classification algorithm
         # Example: Simple thresholding based on elevation
         threshold_value = 0.5  # Adjust threshold value as needed
@@ -48,7 +48,7 @@ class TerrainAnalyzer:
 
         return classified_terrain
 
-    def detect_obstacles(color_image):
+    def detect_obstacles(self, color_image):
         # Placeholder for obstacle detection algorithm
         # Example: Color-based segmentation for obstacle detection
         hsv_image = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
