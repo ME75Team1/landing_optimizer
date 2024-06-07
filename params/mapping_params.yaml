@@ -1,1 +1,1 @@
-/terrain_model_resolution: [8, 8] # grid cells between legs in left-right direction and top-bottom direction, respectively
+/terrain_model_resolution: [8, 16] # grid cells between legs in left-right direction and top-bottom direction, respectively
